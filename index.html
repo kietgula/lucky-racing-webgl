@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Lucky Racing 3D Online — WebGL Playtest (Portrait 9:16)</title>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --panel-bg: rgba(15, 23, 42, 0.90);
+      --panel-border: rgba(148, 163, 184, 0.30);
+      --gold: #fbbf24;
+      --gold-bright: #fde047;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --pink: #ec4899;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --text-main: #f8fafc;
+      --text-dim: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 25%, #1e293b 0%, #090d16 75%);
+      color: var(--text-main);
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Portrait 9:16 Mobile Device Frame */
+    #app-shell {
+      position: relative;
+      width: min(100vw, calc(100vh * 9 / 16));
+      height: min(100vh, calc(100vw * 16 / 9));
+      max-width: 540px;
+      max-height: 960px;
+      background: #0f172a;
+      border-radius: 20px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(255, 255, 255, 0.14);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (max-width: 540px) {
+      #app-shell {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+      }
+    }
+
+    #webgl-container {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Safe Area Overlay Layer */
+    #ui-layer {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Top Persistent Status Bar */
+    .top-profile-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    .badge-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      white-space: nowrap;
+    }
+
+    .pill-profile { color: #38bdf8; cursor: pointer; }
+    .pill-coins { color: var(--gold-bright); }
+    .pill-gems { color: #c084fc; }
+    .pill-room { color: #4ade80; font-size: 11px; }
+
+    /* Buttons */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 800;
+      transition: transform 0.08s ease, filter 0.12s ease, opacity 0.15s ease;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    button:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    button:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+      border: 1px solid #86efac;
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+    }
+
+    .btn-gold {
+      background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
+      border: 1px solid #fde047;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+    }
+
+    .btn-cyan {
+      background: linear-gradient(180deg, #06b6d4 0%, #0e7490 100%);
+      border: 1px solid #67e8f9;
+      box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+    }
+
+    .btn-blue {
+      background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+      border: 1px solid #93c5fd;
+    }
+
+    .btn-purple {
+      background: linear-gradient(180deg, #a855f7 0%, #6b21a8 100%);
+      border: 1px solid #d8b4fe;
+    }
+
+    .btn-red {
+      background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      border: 1px solid #fca5a5;
+    }
+
+    .btn-slate {
+      background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Screens */
+    .screen-view {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex: 1;
+      margin-top: 8px;
+      gap: 8px;
+    }
+
+    .card-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    }
+
+    /* Main Menu Hero */
+    .hero-banner {
+      text-align: center;
+      padding: 14px 12px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 58, 138, 0.85) 100%);
+      border: 1px solid rgba(96, 165, 250, 0.4);
+    }
+
+    .hero-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--gold-bright);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 3px 8px;
+      border-radius: 99px;
+      margin-bottom: 4px;
+    }
+
+    .hero-title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      background: linear-gradient(90deg, #fde047, #f97316, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .hero-sub {
+      font-size: 11px;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    .menu-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .btn-play-giant {
+      padding: 15px 16px;
+      font-size: 16px;
+      letter-spacing: 0.6px;
+      border-radius: 12px;
+    }
+
+    .menu-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .menu-grid-2 button {
+      padding: 11px 10px;
+      font-size: 12px;
+    }
+
+    /* Toast Banner */
+    .toast-banner {
+      background: rgba(234, 179, 8, 0.95);
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 12px;
+      text-align: center;
+      padding: 9px 12px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      line-height: 1.4;
+    }
+
+    /* Betting Drawer */
+    .countdown-header {
+      text-align: center;
+      background: linear-gradient(90deg, rgba(185, 28, 28, 0.92), rgba(217, 119, 6, 0.92));
+      border: 1px solid #fde047;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+
+    .room-indicator-bar {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #38bdf8;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 8px;
+      padding: 5px;
+      margin-bottom: 6px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 5px;
+    }
+
+    .racer-pick-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .racer-btn {
+      padding: 8px 3px;
+      font-size: 11px;
+      border-radius: 9px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      border: 2px solid transparent;
+    }
+
+    .racer-btn.selected {
+      border-color: #fde047;
+      box-shadow: 0 0 12px rgba(253, 224, 71, 0.75);
+      transform: translateY(-2px);
+    }
+
+    .chip-pick-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .chip-btn {
+      padding: 8px 2px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .chip-btn.selected {
+      background: linear-gradient(180deg, #eab308 0%, #ca8a04 100%);
+      color: #090d16;
+      border-color: #fef08a;
+      font-weight: 900;
+    }
+
+    .selection-summary {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      border-radius: 9px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--gold-bright);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .bet-feed-box {
+      background: rgba(2, 6, 23, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 11px;
+      line-height: 1.4;
+      max-height: 85px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+      color: #e2e8f0;
+    }
+
+    /* Racing HUD */
+    .race-top-hud {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .standings-strip {
+      font-size: 11px;
+      font-weight: 800;
+      color: #f8fafc;
+      background: rgba(2, 6, 23, 0.82);
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress-lanes {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .lane-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .lane-bar-label {
+      width: 52px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .lane-bar-track {
+      flex: 1;
+      height: 7px;
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .lane-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 99px;
+      transition: width 0.08s linear;
+    }
+
+    .race-toggles-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .race-toggles-row button {
+      padding: 7px 8px;
+      font-size: 11px;
+    }
+
+    .kill-feed-banner {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(244, 114, 182, 0.45);
+      color: #fbcfe8;
+      padding: 6px 10px;
+      border-radius: 9px;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .charm-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .charm-btn {
+      padding: 9px 4px;
+      border-radius: 10px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      line-height: 1.2;
+    }
+
+    /* Podium View */
+    .podium-banner {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 900;
+      padding: 10px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #b45309, #eab308, #b45309);
+      color: #090d16;
+      margin-bottom: 8px;
+    }
+
+    .rankings-list {
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.65;
+      margin-bottom: 8px;
+    }
+
+    .payout-summary {
+      background: rgba(20, 83, 45, 0.65);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+      border-radius: 10px;
+      padding: 9px;
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-card {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: var(--gold-bright);
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 11px 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      outline: none;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+
+    .modal-input:focus {
+      border-color: #fde047;
+      box-shadow: 0 0 8px rgba(253, 224, 71, 0.5);
+    }
+
+    .preset-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .preset-chip {
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+
+    .preset-chip:hover {
+      background: rgba(59, 130, 246, 0.35);
+      border-color: #60a5fa;
+      color: #fff;
+    }
+
+    .shop-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin: 10px 0;
+    }
+
+    .shop-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .shop-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .shop-item-desc {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+
+    /* 3D Car Floating Labels Overlay */
+    #car-labels-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .car-world-tag {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      padding: 2px 5px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 900;
+      color: #fff;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .car-world-tag.my-bet {
+      background: rgba(234, 179, 8, 0.95);
+      color: #090d16;
+      border-color: #fef08a;
+      box-shadow: 0 0 8px rgba(250, 204, 21, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell">
+    <!-- 3D WebGL Viewport -->
+    <div id="webgl-container">
+      <canvas id="webgl-canvas"></canvas>
+    </div>
+
+    <!-- 3D World-to-Screen Floating Car Badges -->
+    <div id="car-labels-layer"></div>
+
+    <!-- Safe Area UI Layer -->
+    <div id="ui-layer">
+      <!-- Top Persistent Profile Header -->
+      <div class="top-profile-bar interactive">
+        <div class="badge-group">
+          <span id="ui-profile-name" class="pill pill-profile" title="Bấm để đổi tên">TÊN: Racer_459 ✏️</span>
+          <span id="ui-coins" class="pill pill-coins">$500</span>
+          <span id="ui-gems" class="pill pill-gems">25 GEMS</span>
+        </div>
+        <div class="badge-group">
+          <span id="ui-room-code" class="pill pill-room">SẴN SÀNG</span>
+          <button id="btn-audio-toggle" class="btn-slate" style="padding:4px 8px;font-size:11px;" title="Bật/Tắt Âm Thanh">🔊 SFX</button>
+        </div>
+      </div>
+
+      <!-- ================= 1. MAIN MENU SCREEN ================= -->
+      <div id="screen-main-menu" class="screen-view">
+        <div class="card-panel hero-banner interactive">
+          <div class="hero-tag">Unity 6 WebGL Port • Portrait 9:16</div>
+          <div class="hero-title">LUCKY RACING 3D</div>
+          <div id="ui-selected-map-set" class="hero-sub">BẢN ĐỒ 1: CÔNG VIÊN HCMUS &nbsp;|&nbsp; DÀN XE: ĐUA ĐƯỜNG PHỐ</div>
+        </div>
+
+        <div id="ui-toast-banner" class="toast-banner hidden"></div>
+
+        <div class="card-panel menu-actions interactive">
+          <!-- 1. Play Online / Create Room -->
+          <button id="btn-play-online" class="btn-primary btn-play-giant">🏁 CHƠI NGAY / TẠO PHÒNG</button>
+
+          <!-- 2. Join Specific Room by Code -->
+          <button id="btn-join-room" class="btn-cyan" style="padding:13px;font-size:14px;">🚪 VÀO PHÒNG (NHẬP MÃ)</button>
+
+          <!-- 3. Career History & Charm Shop -->
+          <div class="menu-grid-2">
+            <button id="btn-open-history" class="btn-purple">🏆 LỊCH SỬ ĐUA</button>
+            <button id="btn-open-shop" class="btn-blue">⚡ CỬA HÀNG BÙA</button>
+          </div>
+
+          <!-- 4. Rewarded Ads (+100 Coins) - Replaced Dragon Minigame -->
+          <button id="btn-watch-ad" class="btn-gold" style="padding:13px;font-size:14px;letter-spacing:0.4px;">
+            📺 XEM QUẢNG CÁO (+100 VÀNG)
+          </button>
+        </div>
+      </div>
+
+      <!-- ================= 2. BETTING PHASE SCREEN ================= -->
+      <div id="screen-betting" class="screen-view hidden">
+        <div id="ui-bet-countdown" class="countdown-header interactive">
+          ĐẶT CƯỢC KẾT THÚC SAU: 15.0s
+        </div>
+
+        <div class="card-panel interactive">
+          <div id="ui-betting-room-banner" class="room-indicator-bar">
+            PHÒNG: LR-1001
+          </div>
+
+          <div class="section-label">1. CHỌN XE ĐẶT CƯỢC (1–5) — Di chuyển Mũi Tên Vàng 3D</div>
+          <div class="racer-pick-grid">
+            <button class="racer-btn selected" data-racer="0" style="background:#dc2626;"><span>#1</span><span>ĐỎ</span></button>
+            <button class="racer-btn" data-racer="1" style="background:#2563eb;"><span>#2</span><span>XANH</span></button>
+            <button class="racer-btn" data-racer="2" style="background:#db2777;"><span>#3</span><span>HỒNG</span></button>
+            <button class="racer-btn" data-racer="3" style="background:#ca8a04;"><span>#4</span><span>VÀNG</span></button>
+            <button class="racer-btn" data-racer="4" style="background:#16a34a;"><span>#5</span><span>LÁ</span></button>
+          </div>
+
+          <div class="section-label">2. CHỌN MỨC CƯỢC (Giới hạn theo số dư ví)</div>
+          <div class="chip-pick-grid">
+            <button class="chip-btn" data-chip="10">$10</button>
+            <button class="chip-btn selected" data-chip="20">$20</button>
+            <button class="chip-btn" data-chip="50">$50</button>
+            <button class="chip-btn" data-chip="100">$100</button>
+            <button class="chip-btn" data-chip="500">$500</button>
+            <button id="btn-chip-allin" class="chip-btn" style="color:#fde047;">TẤT TAY</button>
+          </div>
+
+          <div id="ui-bet-selection-summary" class="selection-summary">
+            CHỌN: #1 ĐỎ VIPER &nbsp;|&nbsp; MỨC CƯỢC: $20
+          </div>
+
+          <div id="ui-room-bets-feed" class="bet-feed-box"></div>
+
+          <div class="menu-grid-2">
+            <button id="btn-lock-bet" class="btn-primary" style="padding:12px;font-size:14px;">🔒 KHÓA CƯỢC</button>
+            <button id="btn-leave-lobby" class="btn-slate" style="padding:12px;font-size:12px;">↩ MENU CHÍNH</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 3. RACING PHASE HUD ================= -->
+      <div id="screen-racing" class="screen-view hidden">
+        <div class="card-panel race-top-hud interactive">
+          <div id="ui-live-leaderboard" class="standings-strip">
+            1.#1 ĐỎ★(0%)  2.#2 XANH(0%)  3.#3 HỒNG(0%)  4.#4 VÀNG(0%)  5.#5 LÁ(0%)
+          </div>
+          <div class="progress-lanes">
+            <div class="lane-bar-row"><span class="lane-bar-label" style="color:#f87171;">#1 ĐỎ</span><div class="lane-bar-track"><div id="bar-racer-0" class="lane-bar-fill" style="background:#ef4444;"></div></div></div>
+            <div class="lane-bar-row"><span class="lane-bar-label" style="color:#60a5fa;">#2 XANH</span><div class="lane-bar-track"><div id="bar-racer-1" class="lane-bar-fill" style="background:#3b82f6;"></div></div></div>
+            <div class="lane-bar-row"><span class="lane-bar-label" style="color:#f472b6;">#3 HỒNG</span><div class="lane-bar-track"><div id="bar-racer-2" class="lane-bar-fill" style="background:#ec4899;"></div></div></div>
+            <div class="lane-bar-row"><span class="lane-bar-label" style="color:#facc15;">#4 VÀNG</span><div class="lane-bar-track"><div id="bar-racer-3" class="lane-bar-fill" style="background:#eab308;"></div></div></div>
+            <div class="lane-bar-row"><span class="lane-bar-label" style="color:#4ade80;">#5 LÁ</span><div class="lane-bar-track"><div id="bar-racer-4" class="lane-bar-fill" style="background:#22c55e;"></div></div></div>
+          </div>
+          <div class="race-toggles-row">
+            <button id="btn-cam-toggle" class="btn-blue">🎥 GÓC QUAY: THEO DÕI</button>
+            <button id="btn-speed-toggle" class="btn-gold">⏩ TỐC ĐỘ: 1.0x</button>
+          </div>
+        </div>
+
+        <div class="card-panel interactive">
+          <div id="ui-charm-killfeed" class="kill-feed-banner">
+            Kích hoạt Bùa Chú bên dưới để lật ngược tình thế!
+          </div>
+          <div class="charm-grid">
+            <button id="btn-charm-0" class="charm-btn btn-gold" data-charm="0"><span>💫 CHOÁNG</span><span id="lbl-charm-0">(x2)</span></button>
+            <button id="btn-charm-1" class="charm-btn btn-primary" data-charm="1"><span>🚀 VỀ ĐÍCH</span><span id="lbl-charm-1">(x1)</span></button>
+            <button id="btn-charm-2" class="charm-btn btn-purple" data-charm="2"><span>🔀 HOÁN ĐỔI</span><span id="lbl-charm-2">(x1)</span></button>
+            <button id="btn-charm-3" class="charm-btn btn-red" data-charm="3"><span>🔄 QUAY ĐẦU</span><span id="lbl-charm-3">(x1)</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 4. PODIUM RESULT SCREEN ================= -->
+      <div id="screen-podium" class="screen-view hidden">
+        <div></div>
+        <div class="card-panel interactive">
+          <div id="ui-podium-headline" class="podium-banner">
+            HẠNG 1 CHIẾN THẮNG! (ĂN 3X)
+          </div>
+          <div id="ui-podium-rankings" class="rankings-list"></div>
+          <div id="ui-podium-payout" class="payout-summary"></div>
+          <div class="menu-grid-2">
+            <button id="btn-play-again" class="btn-primary" style="padding:12px;font-size:14px;">🔁 CHƠI TIẾP</button>
+            <button id="btn-podium-menu" class="btn-slate" style="padding:12px;font-size:13px;">🏠 MENU CHÍNH</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: ĐỔI TÊN NGƯỜI CHƠI ================= -->
+    <div id="modal-name" class="modal-backdrop hidden interactive">
+      <div class="modal-card">
+        <div class="modal-title">✏️ ĐẶT TÊN NGƯỜI CHƠI</div>
+        <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">
+          Nhập nickname hiển thị của bạn hoặc chọn tên nhanh:
+        </div>
+        <input type="text" id="input-player-name" class="modal-input" maxlength="16" placeholder="Nhập tên của bạn..." />
+        <div class="preset-chips-row">
+          <span class="preset-chip btn-name-preset" data-name="Racer_101">Racer_101</span>
+          <span class="preset-chip btn-name-preset" data-name="Racer_459">Racer_459</span>
+          <span class="preset-chip btn-name-preset" data-name="Racer_888">Racer_888</span>
+          <span class="preset-chip btn-name-preset" data-name="Kiet_Pro">Kiet_Pro</span>
+          <span class="preset-chip btn-name-preset" data-name="Speedy">Speedy</span>
+        </div>
+        <div class="menu-grid-2">
+          <button id="btn-confirm-name" class="btn-primary" style="padding:11px;font-size:13px;">LƯU TÊN</button>
+          <button id="btn-close-name" class="btn-slate" style="padding:11px;font-size:13px;">HỦY</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: VÀO PHÒNG BẰNG MÃ ================= -->
+    <div id="modal-join-room" class="modal-backdrop hidden interactive">
+      <div class="modal-card">
+        <div class="modal-title">🚪 VÀO PHÒNG ĐUA (NHẬP MÃ)</div>
+        <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">
+          Nhập mã phòng bạn muốn tham gia hoặc chọn phòng mẫu:
+        </div>
+        <input type="text" id="input-room-code" class="modal-input" maxlength="10" placeholder="VD: LR-1001" />
+        <div class="preset-chips-row">
+          <span class="preset-chip btn-room-preset" data-code="LR-1001">LR-1001</span>
+          <span class="preset-chip btn-room-preset" data-code="LR-2026">LR-2026</span>
+          <span class="preset-chip btn-room-preset" data-code="LR-7777">LR-7777</span>
+          <span class="preset-chip btn-room-preset" data-code="LR-8888">LR-8888</span>
+        </div>
+        <div class="menu-grid-2">
+          <button id="btn-confirm-join-room" class="btn-cyan" style="padding:11px;font-size:13px;">VÀO PHÒNG</button>
+          <button id="btn-close-join-room" class="btn-slate" style="padding:11px;font-size:13px;">HỦY</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: LỊCH SỬ THÀNH TÍCH ĐUA ================= -->
+    <div id="modal-history" class="modal-backdrop hidden interactive">
+      <div class="modal-card">
+        <div class="modal-title">🏆 THÀNH TÍCH THI ĐẤU</div>
+        <div id="ui-history-body" style="font-size:13px;line-height:1.7;color:#e2e8f0;background:rgba(2,6,23,0.7);padding:12px;border-radius:10px;margin-bottom:12px;"></div>
+        <button id="btn-close-history" class="btn-blue" style="width:100%;padding:11px;font-size:13px;">ĐÓNG</button>
+      </div>
+    </div>
+
+    <!-- ================= MODAL: CỬA HÀNG BÙA CHÚ ================= -->
+    <div id="modal-shop" class="modal-backdrop hidden interactive">
+      <div class="modal-card">
+        <div class="modal-title">⚡ CỬA HÀNG BÙA CHÚ (CHAOS CHARMS)</div>
+        <div style="text-align:center;font-size:12px;color:#cbd5e1;margin-bottom:6px;">
+          Mua thêm bùa chú trước khi vào sảnh cược!
+        </div>
+        <div id="ui-shop-wallet" style="text-align:center;font-size:13px;font-weight:900;color:#fde047;margin-bottom:8px;">
+          VÍ CỦA BẠN: $500
+        </div>
+        <div class="shop-list">
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <strong>💫 BÙA CHOÁNG <span id="shop-cnt-0" style="color:#38bdf8;">(Có: 2)</span></strong>
+              <span class="shop-item-desc">Làm 1–3 xe ngẫu nhiên bị choáng 2.8s</span>
+            </div>
+            <button class="btn-gold btn-buy-charm" data-charm="0" data-cost="50" style="padding:7px 11px;font-size:11px;">MUA $50</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <strong>🚀 BÙA VỀ ĐÍCH <span id="shop-cnt-1" style="color:#38bdf8;">(Có: 1)</span></strong>
+              <span class="shop-item-desc">Đẩy 1 xe ngẫu nhiên phóng đến mốc 92%+</span>
+            </div>
+            <button class="btn-primary btn-buy-charm" data-charm="1" data-cost="100" style="padding:7px 11px;font-size:11px;">MUA $100</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <strong>🔀 BÙA HOÁN ĐỔI <span id="shop-cnt-2" style="color:#38bdf8;">(Có: 1)</span></strong>
+              <span class="shop-item-desc">Hoán đổi vị trí xoay vòng các xe chưa về đích</span>
+            </div>
+            <button class="btn-purple btn-buy-charm" data-charm="2" data-cost="250" style="padding:7px 11px;font-size:11px;">MUA $250</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <strong>🔄 BÙA QUAY ĐẦU <span id="shop-cnt-3" style="color:#38bdf8;">(Có: 1)</span></strong>
+              <span class="shop-item-desc">Bắt các xe chạy lùi lại đường đua trong 2.0s</span>
+            </div>
+            <button class="btn-red btn-buy-charm" data-charm="3" data-cost="400" style="padding:7px 11px;font-size:11px;">MUA $400</button>
+          </div>
+        </div>
+        <button id="btn-close-shop" class="btn-slate" style="width:100%;padding:11px;font-size:13px;">XONG</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
